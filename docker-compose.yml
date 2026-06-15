@@ -1,0 +1,18 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - BACKEND_SERVICE_URL=http://microservice:8001
+    depends_on:
+      - microservice
+
+  microservice:
+    build:
+      context: .
+      dockerfile: Dockerfile.microservice
+    ports:
+      - "8001:8001"
