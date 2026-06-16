@@ -1,1 +1,8 @@
 .terraform/
+*.tfstate
+*.tfstate.*
+__pycache__/
+# Python Virtual Environments
+venv/
+env/
+.venv/

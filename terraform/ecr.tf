@@ -32,12 +32,3 @@ resource "aws_ecr_repository" "microservice" {
     Name = "zerogate-microservice-repo"
   }
 }
-
-# Output the repository URLs to the terminal after creation so we can use them!
-output "gateway_repo_url" {
-  value = aws_ecr_repository.gateway.repository_url
-}
-
-output "microservice_repo_url" {
-  value = aws_ecr_repository.microservice.repository_url
-}

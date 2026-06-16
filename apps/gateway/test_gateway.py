@@ -1,7 +1,7 @@
 # test_gateway.py
 import pytest
 from fastapi.testclient import TestClient
-from apps.gateway.gateway import app, rate_limit_records
+from gateway import app, rate_limit_records
 
 # --- Test Environment Lifecycle Management ---
 @pytest.fixture

@@ -1,48 +1,10 @@
+data "aws_caller_identity" "current" {}
+
 # ------------------------------------------------------
 # ECS Cluster
 # ------------------------------------------------------
 resource "aws_ecs_cluster" "main" {
   name = "zerogate-cluster"
-}
-
-# ------------------------------------------------------
-# IAM Roles for ECS Execution
-# ------------------------------------------------------
-# Allows ECS to pull images from ECR and send logs to CloudWatch
-resource "aws_iam_role" "ecs_execution_role" {
-  name = "zerogate-ecs-execution-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action    = "sts:AssumeRole"
-        Effect    = "Allow"
-        Principal = { Service = "ecs-tasks.amazonaws.com" }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "ecs_execution" {
-  role       = aws_iam_role.ecs_execution_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
-
-# Allows the actual container code to interact with other AWS services
-resource "aws_iam_role" "ecs_task_role" {
-  name = "zerogate-ecs-task-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action    = "sts:AssumeRole"
-        Effect    = "Allow"
-        Principal = { Service = "ecs-tasks.amazonaws.com" }
-      }
-    ]
-  })
 }
 
 # ------------------------------------------------------
@@ -67,7 +29,7 @@ resource "aws_ecs_task_definition" "microservice" {
   container_definitions = jsonencode([
     {
       name      = "microservice"
-      image     = "989142032335.dkr.ecr.us-east-1.amazonaws.com/zerogate-microservice:latest"
+      image     = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/zerogate-microservice:latest"
       essential = true
       portMappings = [
         {
@@ -97,7 +59,7 @@ resource "aws_ecs_task_definition" "gateway" {
   container_definitions = jsonencode([
     {
       name      = "gateway"
-      image     = "989142032335.dkr.ecr.us-east-1.amazonaws.com/zerogate-gateway:latest"
+      image     = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/zerogate-gateway:latest"
       essential = true
       portMappings = [
         {

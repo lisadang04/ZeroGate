@@ -47,11 +47,3 @@ resource "aws_lb_listener" "http" {
     target_group_arn = aws_lb_target_group.gateway_tg.arn
   }
 }
-
-# ------------------------------------------------------
-# Output the Public URL
-# ------------------------------------------------------
-output "alb_dns_name" {
-  value       = aws_lb.main.dns_name
-  description = "The public URL of the Zero-Trust Gateway"
-}

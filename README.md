@@ -1,46 +1,97 @@
-# Zero-Trust API Gateway | A high-concurrency, production-ready reverse proxy
+# ZeroGate: Cloud-Native Zero-Trust API Gateway
 
-A production-ready, zero-trust API Gateway built with FastAPI. Features async high-concurrency, fixed-window rate limiting for DDoS protection, and custom JSON logging middleware for Datadog and Splunk observability. Fully containerized via multi-stage, non-root Docker builds and backed by a comprehensive Pytest test suite for 100% path coverage.
+ZeroGate is a high-concurrency, containerized API gateway deployed on AWS Fargate. It secures internal microservices by enforcing strict identity token validation, fixed-window rate limiting, and real-time telemetry streaming before traffic ever reaches the private network layer.
 
-## Technical Stack
 
-![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)
+
+---
+
+## Highlights
+* **Zero-Trust Perimeter:** Rejects unauthenticated traffic at the edge, ensuring downstream microservices only process verified requests.
+* **Infrastructure as Code (IaC):** 100% of the AWS environment (VPCs, ALBs, ECS clusters) is provisioned dynamically using Terraform.
+* **Defense in Depth:** Utilizes cascaded AWS Security Groups to physically isolate backend containers from the internet.
+* **Observability First:** Injects structured JSON telemetry logs with sub-millisecond latency tracking into standard output for seamless Datadog/Splunk ingestion.
+
+---
+
+## Overview
+As modern distributed systems scale, the traditional "castle-and-moat" security model falls apart. If an attacker breaches the perimeter, they gain lateral access to everything. 
+
+ZeroGate was built to solve this by moving authentication directly to the service edge. Acting as an asynchronous reverse proxy, it intercepts traffic, executes security middleware, and routes validated requests via AWS Cloud Map internal DNS. It demonstrates a complete, production-ready cloud deployment lifecycle from local Docker development to highly available AWS Fargate orchestration.
+
+---
+
+## Engineering Decisions & The "Why"
+
+This architecture required solving several deep systems-engineering challenges to ensure performance, security, and cloud compatibility.
+
+* **Avoiding the `.local` Multicast DNS Trap:** Initially, AWS Application Load Balancer health checks failed due to `504 Gateway Time-out` errors. I diagnosed this as a blocking loop inside the Debian container's `systemd-resolved` daemon, which intercepted `.local` addresses as Multicast DNS queries instead of routing them to the AWS Route 53 Resolver. I engineered a fix by migrating the VPC's private hosted zone to an `.internal` namespace, entirely bypassing the Linux mDNS trap and restoring sub-millisecond dynamic routing.
+* **Custom ALB Health Checks:** Standard AWS Load Balancers terminate containers that do not return a `200 OK`. However, a true Zero-Trust gateway *should* return a `401 Unauthorized` to unauthenticated pings. I customized the Terraform Target Group matcher (`matcher = "200,401"`) to explicitly accept `401` responses, harmonizing strict application security with infrastructure lifecycle checks.
+* **ARM64 Compute Optimization:** To prevent `exec format errors` caused by deploying Apple Silicon-built Docker images onto default x86_64 nodes, I optimized the Terraform `runtime_platform` to explicitly provision ARM64 Fargate instances. This eliminated emulation overhead during CI/CD builds and reduced cluster compute costs by 20%.
+* **Asynchronous Concurrency:** The gateway is built on FastAPI and `httpx` to leverage native asynchronous Python (`async/await`). This prevents blocking threads during network I/O, allowing the gateway to handle high-throughput authentication routing without premature horizontal scaling.
+
+---
+
+## Technologies Used
 ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi&logoColor=white)
 ![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-844FBA?style=for-the-badge&logo=terraform&logoColor=white)
+![AWS](https://img.shields.io/badge/Amazon_AWS-232F3E?style=for-the-badge&logo=amazonaws&logoColor=white)
 
-* **Backend Framework:** FastAPI, Python 3
-* **Async HTTP Client:** HTTPX
-* **Server:** Uvicorn
-* **Testing:** Pytest, TestClient
-* **DevOps / Deployment:** Docker, Docker Compose
+* **Application:** Python 3.12, FastAPI, Uvicorn, Pytest
+* **Containerization:** Docker, Multi-Stage Builds, Non-Root Execution
+* **Cloud Infrastructure:** AWS (VPC, ALB, ECS Fargate, ECR, Cloud Map, Route Table/NAT Gateway)
+* **Provisioning:** Terraform (HCL)
 
-## Core Features
+---
 
-* **Zero-Trust Architecture:** Intercepts all traffic and assumes nothing is safe. Validates identity tokens explicitly before routing traffic to internal services.
-* **In-Memory Rate Limiting:** Implements a sliding/fixed-window rate limiter (max 5 requests / 10 seconds per token) to mitigate brute-force and DDoS attacks against downstream services.
-* **Asynchronous Concurrency:** Utilizes modern `async/await` patterns and shared connection pools via FastAPI lifecycle events (`@asynccontextmanager`) to ensure non-blocking, high-throughput routing.
-* **Production-Grade Observability:** Custom middleware calculates exact network latency and intercepts requests to generate highly structured, machine-readable JSON logs ready for Datadog or Splunk ingestion.
-* **Robust Test Suite:** Automated testing suite utilizing Pytest fixtures to simulate application lifecycles, guaranteeing state isolation between tests and 100% path coverage.
+## Local Usage
 
-## How To Run It
+You can spin up the entire isolated microservice environment locally using Docker Compose.
 
-You can spin up the entire isolated environment (the Gateway and the protected Microservice) using Docker. 
-
-**1. Build and start the containers:**
 ```bash
+# Clone the repository
+git clone [https://github.com/YourUsername/ZeroGate.git](https://github.com/YourUsername/ZeroGate.git)
+cd ZeroGate
+
+# Build and start the local cluster
 docker compose up --build
-```
 
-**2. Test the Zero-Trust routing:**
-Once the containers are running, execute the following curl command in a new terminal window to pass the required identity token and access the secure backend:
+# Test the Zero-Trust rejection (Returns 401)
+curl -i [http://127.0.0.1:8000/api/v1/secure-data](http://127.0.0.1:8000/api/v1/secure-data)
 
-```bash
+# Test successful authentication (Returns 200)
 curl -i -H "Authorization: Bearer clear-secure-identity-token-2026" [http://127.0.0.1:8000/api/v1/secure-data](http://127.0.0.1:8000/api/v1/secure-data)
 ```
-Try running the command 6 times in rapid succession to trigger the HTTP 429 Rate Limit response!
+---
+## Automated Testing
 
-## Why I Made This
-The motivation behind this project was to understand the critical infrastructure that sits between public clients and private microservices. Instead of simply building a standard REST API, I wanted to engineer the "front door" itself.
+This project utilizes `pytest` alongside `httpx` to validate the asynchronous routing and security middleware. The test suite ensures 100% path coverage for the authentication perimeter.
 
-By building this gateway, I tackled the challenges of reverse proxying, state management in an asynchronous environment, and the necessity of strict security layers. I specifically focused on observability; rather than relying on standard text logs, I engineered a telemetry pipeline that outputs structured JSON to simulate how enterprise systems feed data into centralized monitoring tools like Datadog. 
+```bash
+cd apps/gateway
+pytest test_gateway.py -v
+```
+---
+## Cloud Deployment (Terraform)
+The `terraform/` directory contains the complete infrastructure blueprint for deploying this stack to AWS.
+
+```bash
+cd terraform
+
+# Initialize the AWS provider
+terraform init
+
+# Review the infrastructure execution plan
+terraform plan
+
+# Deploy the network, clusters, and load balancers to AWS
+terraform apply
+```
+---
+## Author
+Designed and engineered by Lisa Dang.
+
+If you are interested in discussing cloud architecture, threat modeling, or backend optimization, feel free to reach out via [LinkedIn](http://linkedin.com/in/lisa-dang04) or check out my other projects.
