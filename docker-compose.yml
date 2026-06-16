@@ -1,8 +1,8 @@
 services:
   gateway:
     build:
-      context: .
-      dockerfile: Dockerfile.gateway
+      context: ./apps/gateway
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     environment:
@@ -12,7 +12,7 @@ services:
 
   microservice:
     build:
-      context: .
-      dockerfile: Dockerfile.microservice
+      context: ./apps/microservice
+      dockerfile: Dockerfile
     ports:
       - "8001:8001"
