@@ -3,7 +3,7 @@
 ZeroGate is a high-concurrency, containerized API gateway deployed on AWS Fargate. It secures internal microservices by enforcing strict identity token validation, fixed-window rate limiting, and real-time telemetry streaming before traffic ever reaches the private network layer.
 
 <img width="825" height="681" alt="ZeroGate Diagram" src="https://github.com/user-attachments/assets/15561e27-42c4-40c1-8644-dda07abc527e" />
-
+Made in Excalidraw.
 ---
 
 ## Highlights
